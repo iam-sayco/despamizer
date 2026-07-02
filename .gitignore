@@ -1,0 +1,12 @@
+.venv/
+.git-local/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+despamizer/logs/
+despamizer/config.yaml
+logs/
+state/
+config.yaml
+.env

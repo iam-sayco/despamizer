@@ -1,0 +1,11 @@
+required_score 5.0
+report_safe 0
+use_bayes 1
+bayes_auto_learn 1
+skip_rbl_checks 0
+
+# Add global allow/block preferences here when they apply to every mailbox.
+# Prefer per-mailbox whitelist/blacklist in config.yaml for account-specific policy.
+#
+# whitelist_from trusted@example.com
+# blacklist_from spammer@example.net

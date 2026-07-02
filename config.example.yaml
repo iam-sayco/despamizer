@@ -1,0 +1,28 @@
+mailboxes:
+  - name: personal
+    host: imap.example.com
+    port: 993
+    username: user@example.com
+    password: change-me
+    inbox_folder: INBOX
+    spam_folder: Junk
+    whitelist:
+      senders:
+        - trusted@example.com
+      domains:
+        - important-bank.example
+    blacklist:
+      senders:
+        - scammer@example.net
+      domains:
+        - spam-domain.example
+    rules:
+      - type: sender
+        pattern: "@spam-domain\\.example$"
+        score: 10
+      - type: subject
+        pattern: "free money|crypto giveaway"
+        score: 8
+      - type: body
+        pattern: "unsubscribe here"
+        score: 2

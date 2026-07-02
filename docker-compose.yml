@@ -1,0 +1,74 @@
+services:
+  despamizer:
+    build: .
+    container_name: despamizer
+    restart: unless-stopped
+    env_file:
+      - path: .env.default
+        required: true
+      - path: .env
+        required: false
+    depends_on:
+      config-permissions:
+        condition: service_completed_successfully
+      spamassassin:
+        condition: service_started
+    volumes:
+      - ./despamizer:/app/despamizer:ro
+      - ./config.yaml:/app/config.yaml:ro
+      - ./logs:/app/logs
+      - ./state:/app/state
+    networks:
+      - despamizer-internal
+
+  config-permissions:
+    image: busybox:1.36
+    command: ["chmod", "600", "/app/config.yaml"]
+    network_mode: "none"
+    restart: "no"
+    volumes:
+      - ./config.yaml:/app/config.yaml
+
+  despamizer-dev:
+    build: .
+    profiles:
+      - dev
+    env_file:
+      - path: .env.default
+        required: true
+      - path: .env
+        required: false
+    working_dir: /app
+    volumes:
+      - .:/app
+      - poetry-venvs:/opt/poetry-venvs
+      - poetry-cache:/opt/poetry-cache
+    command: poetry run pytest
+    networks:
+      - despamizer-internal
+
+  spamassassin:
+    build:
+      context: ./docker/spamassassin
+    container_name: despamizer-spamassassin
+    restart: unless-stopped
+    expose:
+      - "783"
+    volumes:
+      - ./docker/spamassassin/local.cf:/etc/spamassassin/local.cf:ro
+      - spamassassin-state:/var/lib/spamassassin
+    env_file:
+      - path: .env.default
+        required: true
+      - path: .env
+        required: false
+    networks:
+      - despamizer-internal
+
+networks:
+  despamizer-internal:
+
+volumes:
+  spamassassin-state:
+  poetry-venvs:
+  poetry-cache:
