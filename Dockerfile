@@ -9,7 +9,8 @@ ENV POETRY_CACHE_DIR=/opt/poetry-cache
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+RUN python -m pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir "poetry==$POETRY_VERSION"
 
 COPY pyproject.toml poetry.lock README.md ./
 

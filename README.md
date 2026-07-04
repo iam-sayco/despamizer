@@ -215,11 +215,13 @@ State variables:
 Spam policy variables:
 
 - `DESPAMIZER_SPAM_SCORE_MIN`: local regex score threshold, default `5.0`.
+- `DESPAMIZER_RULE_TEXT_MAX_CHARS`: max sender, subject, or body characters evaluated by custom regex rules, default `200000`.
 - `DESPAMIZER_SPAMASSASSIN_ENABLED`: enables SpamAssassin scoring, default `true`.
 - `DESPAMIZER_SPAMASSASSIN_HOST`: internal spamd host, default `spamassassin`.
 - `DESPAMIZER_SPAMASSASSIN_PORT`: internal spamd port, default `783`.
 - `DESPAMIZER_SPAMASSASSIN_TIMEOUT_SECONDS`: spamd timeout, default `15`.
 - `DESPAMIZER_SPAMASSASSIN_REQUIRED_SCORE`: SpamAssassin threshold override, default `5.0`.
+- `DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX`: max bytes sent to SpamAssassin, default `5000000`.
 
 Learning variables:
 
@@ -264,6 +266,8 @@ SpamAssassin runs locally in the `spamassassin` container. It can use local rule
 
 Global SpamAssassin settings live in `docker/spamassassin/local.cf`. The container runs `sa-update` on startup and then every `SA_UPDATE_INTERVAL_SECONDS`.
 
+Oversized messages are trimmed before they are sent to SpamAssassin. Despamizer preserves the message headers and sends a bounded body sample according to `DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX`.
+
 Bayes data and updated SpamAssassin rules are stored in the `spamassassin-state` Docker volume.
 
 ## Development
@@ -280,6 +284,8 @@ Refresh the lock file inside Docker:
 make lock
 ```
 
+GitHub Actions run lint, tests, dependency audit, secret scanning, and filesystem vulnerability scanning on pushes and pull requests.
+
 ## Safety Model
 
 - No message deletion is implemented.
@@ -287,8 +293,15 @@ make lock
 - Only `inbox_folder` to `spam_folder` moves are performed.
 - Dry-run mode is enabled by default.
 - Invalid regex rules fail config loading before IMAP processing.
+- Log output escapes control characters from untrusted mail data to prevent log forging.
+- Regex matching and SpamAssassin payloads use configurable size limits to reduce resource-exhaustion risk.
+- The worker container uses a read-only root filesystem, no Linux capabilities, `no-new-privileges`, and a tmpfs `/tmp`.
 - One mailbox failure is logged and does not stop other mailboxes.
 - SpamAssassin is internal to Compose and is not exposed through host ports.
+
+## License
+
+Despamizer is licensed under the GNU Affero General Public License v3.0 or later. See `LICENSE`.
 
 ## Requirements
 

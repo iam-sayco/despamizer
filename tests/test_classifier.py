@@ -14,11 +14,13 @@ from despamizer.spamassassin import SpamAssassinResult
 
 class FakeSpamAssassin:
     result = SpamAssassinResult(available=False)
+    calls = 0
 
     def __init__(self, settings):
         self.settings = settings
 
     def check(self, message):
+        self.__class__.calls += 1
         return self.result
 
 
@@ -110,6 +112,40 @@ def test_classifier_accumulates_rule_scores():
 
     assert result.is_spam is True
     assert result.score == 10
+
+
+def test_classifier_skips_spamassassin_when_local_rules_are_decisive(monkeypatch):
+    monkeypatch.setattr("despamizer.classifier.SpamAssassinClient", FakeSpamAssassin)
+    FakeSpamAssassin.calls = 0
+    FakeSpamAssassin.result = SpamAssassinResult(
+        available=True,
+        is_spam=False,
+        score=0.0,
+        required_score=5.0,
+    )
+    classifier = SpamClassifier(
+        SpamSettings(
+            min_score=5,
+            spamassassin=SpamAssassinSettings(enabled=True),
+        )
+    )
+    message = EmailMessage(
+        uid="1",
+        message_id="<spam-1@example.com>",
+        sender="promo@spam.example",
+        subject="hello",
+        body="normal body",
+    )
+    rules = [
+        FilterRule(RuleType.SENDER, compile_rule_pattern("@spam\\.example$"), 5)
+    ]
+
+    result = classifier.classify(message, mailbox_with_rules(rules))
+
+    assert result.is_spam is True
+    assert result.score == 5
+    assert result.reasons == ["rule:sender:@spam\\.example$"]
+    assert FakeSpamAssassin.calls == 0
 
 
 def test_classifier_whitelist_wins_over_blacklist_and_rules():

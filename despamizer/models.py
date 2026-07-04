@@ -41,6 +41,7 @@ class SpamAssassinSettings:
     port: int = 783
     timeout_seconds: int = 15
     required_score: float | None = None
+    message_bytes_max: int = 5_000_000
 
 
 @dataclass(frozen=True)
@@ -67,6 +68,7 @@ class SpamSettings:
     """Global spam scoring settings."""
 
     min_score: float = 5.0
+    rule_text_max_chars: int = 200_000
     spamassassin: SpamAssassinSettings = field(default_factory=SpamAssassinSettings)
     learning: LearningSettings = field(default_factory=LearningSettings)
 

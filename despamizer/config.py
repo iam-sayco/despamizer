@@ -110,6 +110,10 @@ def _parse_spam_settings() -> SpamSettings:
             _env("DESPAMIZER_SPAM_SCORE_MIN", "5.0"),
             "DESPAMIZER_SPAM_SCORE_MIN",
         ),
+        rule_text_max_chars=_positive_int(
+            _env("DESPAMIZER_RULE_TEXT_MAX_CHARS", "200000"),
+            "DESPAMIZER_RULE_TEXT_MAX_CHARS",
+        ),
         spamassassin=SpamAssassinSettings(
             enabled=_bool_env("DESPAMIZER_SPAMASSASSIN_ENABLED", default=True),
             host=_env("DESPAMIZER_SPAMASSASSIN_HOST", "spamassassin"),
@@ -124,6 +128,10 @@ def _parse_spam_settings() -> SpamSettings:
             required_score=None
             if not required_score
             else _number(required_score, "DESPAMIZER_SPAMASSASSIN_REQUIRED_SCORE"),
+            message_bytes_max=_positive_int(
+                _env("DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX", "5000000"),
+                "DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX",
+            ),
         ),
         learning=LearningSettings(
             enabled=_bool_env("DESPAMIZER_LEARNING_ENABLED", default=True),

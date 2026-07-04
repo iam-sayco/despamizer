@@ -11,6 +11,8 @@ from sqlmodel import Field, Session, SQLModel, create_engine, select
 
 from .models import EmailMessage, StateSettings
 
+MAX_STORED_TEXT_CHARS = 1000
+
 
 @dataclass(frozen=True)
 class MessageFingerprint:
@@ -124,23 +126,23 @@ class WorkerState:
                 row = MessageState(
                     mailbox=mailbox,
                     fingerprint=fingerprint.value,
-                    message_id=fingerprint.message_id,
-                    sender=message.sender,
-                    subject=message.subject,
+                    message_id=_truncate_text(fingerprint.message_id),
+                    sender=_truncate_text(message.sender),
+                    subject=_truncate_text(message.subject),
                     status=status,
                     learned_as=learned_as,
-                    reason=reason,
+                    reason=_truncate_text(reason),
                     first_seen_at=now,
                     updated_at=now,
                     expires_at=expires_at,
                 )
             else:
-                row.message_id = fingerprint.message_id
-                row.sender = message.sender
-                row.subject = message.subject
+                row.message_id = _truncate_text(fingerprint.message_id)
+                row.sender = _truncate_text(message.sender)
+                row.subject = _truncate_text(message.subject)
                 row.status = status
                 row.learned_as = learned_as
-                row.reason = reason
+                row.reason = _truncate_text(reason)
                 row.updated_at = now
                 row.expires_at = expires_at
             session.add(row)
@@ -166,3 +168,9 @@ def fingerprint_message(message: EmailMessage) -> MessageFingerprint:
         value=hashlib.sha256(fallback.encode()).hexdigest(),
         message_id="",
     )
+
+
+def _truncate_text(value: str) -> str:
+    if len(value) <= MAX_STORED_TEXT_CHARS:
+        return value
+    return value[:MAX_STORED_TEXT_CHARS]

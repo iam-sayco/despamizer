@@ -18,6 +18,13 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./logs:/app/logs
       - ./state:/app/state
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
     networks:
       - despamizer-internal
 

@@ -23,6 +23,17 @@ def test_log_message_prints_if_verbose(monkeypatch, capsys):
         assert "visible entry" in captured.out
 
 
+def test_log_message_escapes_control_characters(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        log_path = Path(tmpdir) / "test.log"
+        monkeypatch.setattr("despamizer.logger.log_file", log_path)
+        log_message("subject\r\n[FAKE] injected\tvalue")
+
+        lines = log_path.read_text().splitlines()
+        assert len(lines) == 1
+        assert "\\r\\n[FAKE] injected\\tvalue" in lines[0]
+
+
 def test_cleanup_logs(monkeypatch):
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir)

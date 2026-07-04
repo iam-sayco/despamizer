@@ -32,7 +32,9 @@ def test_parse_config_builds_typed_config(monkeypatch):
     monkeypatch.setenv("DESPAMIZER_STATE_PATH", "/app/state/test.sqlite")
     monkeypatch.setenv("DESPAMIZER_STATE_RETENTION_DAYS", "180")
     monkeypatch.setenv("DESPAMIZER_SPAM_SCORE_MIN", "5")
+    monkeypatch.setenv("DESPAMIZER_RULE_TEXT_MAX_CHARS", "1000")
     monkeypatch.setenv("DESPAMIZER_SPAMASSASSIN_HOST", "spamassassin")
+    monkeypatch.setenv("DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX", "2048")
     monkeypatch.setenv("DESPAMIZER_LEARNING_SPAM_FOLDER_MESSAGES_MAX", "50")
 
     config = parse_config(valid_config())
@@ -42,7 +44,9 @@ def test_parse_config_builds_typed_config(monkeypatch):
     assert config.spam.min_score == 5
     assert config.state.path == "/app/state/test.sqlite"
     assert config.state.retention_days == 180
+    assert config.spam.rule_text_max_chars == 1000
     assert config.spam.spamassassin.host == "spamassassin"
+    assert config.spam.spamassassin.message_bytes_max == 2048
     assert config.spam.learning.max_spam_folder_messages_per_run == 50
     assert config.mailboxes[0].whitelist.senders == ["friend@example.com"]
     assert config.mailboxes[0].blacklist.domains == ["spam.example"]
@@ -97,7 +101,9 @@ def test_parse_config_uses_safe_runtime_defaults(monkeypatch):
         "DESPAMIZER_STATE_PATH",
         "DESPAMIZER_STATE_RETENTION_DAYS",
         "DESPAMIZER_SPAM_SCORE_MIN",
+        "DESPAMIZER_RULE_TEXT_MAX_CHARS",
         "DESPAMIZER_SPAMASSASSIN_HOST",
+        "DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX",
         "DESPAMIZER_LEARNING_SPAM_FOLDER_MESSAGES_MAX",
     ]:
         monkeypatch.delenv(name, raising=False)
@@ -107,6 +113,8 @@ def test_parse_config_uses_safe_runtime_defaults(monkeypatch):
     assert config.poll_interval_seconds == 300
     assert config.dry_run is True
     assert config.state.path == "/app/state/despamizer.sqlite"
+    assert config.spam.rule_text_max_chars == 200000
+    assert config.spam.spamassassin.message_bytes_max == 5000000
 
 
 def test_parse_config_rejects_invalid_env_bool(monkeypatch):

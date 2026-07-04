@@ -1,5 +1,9 @@
 from despamizer.models import EmailMessage, SpamAssassinSettings
-from despamizer.spamassassin import SpamAssassinClient, _parse_response
+from despamizer.spamassassin import (
+    SpamAssassinClient,
+    _build_raw_message,
+    _parse_response,
+)
 
 
 class FakeSocket:
@@ -70,6 +74,56 @@ def test_client_sends_check_request(monkeypatch):
     assert fake_socket.sent.startswith(b"CHECK SPAMC/1.5\r\nContent-length:")
     assert result.available is True
     assert result.is_spam is False
+
+
+def test_client_trims_oversized_raw_message(monkeypatch):
+    fake_socket = FakeSocket(
+        [b"SPAMD/1.5 0 EX_OK\r\nSpam: False ; 1.0 / 5.0\r\n\r\n"]
+    )
+    monkeypatch.setattr(
+        "despamizer.spamassassin.socket.create_connection",
+        lambda address, timeout: fake_socket,
+    )
+    monkeypatch.setattr("despamizer.spamassassin.log_message", lambda message: None)
+
+    client = SpamAssassinClient(
+        SpamAssassinSettings(
+            enabled=True,
+            message_bytes_max=36,
+        )
+    )
+    client.check(
+        EmailMessage(
+            uid="1",
+            message_id="<sender-1@example.com>",
+            sender="sender@example.com",
+            subject="hello",
+            body="body",
+            raw=b"From: sender@example.com\r\n\r\n0123456789abcdef",
+        )
+    )
+
+    assert b"Content-length: 36" in fake_socket.sent
+    assert fake_socket.sent.endswith(b"From: sender@example.com\r\n\r\n01234567")
+
+
+def test_build_raw_message_sanitizes_header_injection():
+    raw_message = _build_raw_message(
+        EmailMessage(
+            uid="1",
+            message_id="<sender-1@example.com>",
+            sender="sender@example.com\r\nBcc: attacker@example.com",
+            subject="hello\r\nX-Injected: yes",
+            body="body",
+        )
+    )
+
+    headers = raw_message.split(b"\r\n\r\n", maxsplit=1)[0]
+    header_lines = headers.split(b"\r\n")
+    assert b"Bcc: attacker@example.com" not in header_lines
+    assert b"X-Injected: yes" not in header_lines
+    assert b"sender@example.com Bcc: attacker@example.com" in headers
+    assert b"hello X-Injected: yes" in headers
 
 
 def test_client_returns_unavailable_on_connection_error(monkeypatch):

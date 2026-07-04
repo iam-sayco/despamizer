@@ -42,10 +42,17 @@ class SpamClassifier:
         reasons = []
 
         for rule in mailbox.rules:
-            value = _message_value(message, rule.type)
+            value = _message_value(message, rule.type, self.settings.rule_text_max_chars)
             if rule.pattern.search(value):
                 score += rule.score
                 reasons.append(f"rule:{rule.type.value}:{rule.pattern.pattern}")
+
+        if score >= self.settings.min_score:
+            return Classification(
+                is_spam=True,
+                score=score,
+                reasons=reasons,
+            )
 
         spamassassin_result = self.spamassassin.check(message)
         if spamassassin_result.available:
@@ -69,12 +76,16 @@ class SpamClassifier:
         )
 
 
-def _message_value(message: EmailMessage, rule_type: RuleType) -> str:
+def _message_value(
+    message: EmailMessage,
+    rule_type: RuleType,
+    max_chars: int,
+) -> str:
     if rule_type == RuleType.SENDER:
-        return message.sender
+        return message.sender[:max_chars]
     if rule_type == RuleType.SUBJECT:
-        return message.subject
-    return message.body
+        return message.subject[:max_chars]
+    return message.body[:max_chars]
 
 
 def _address_matches(sender: str, address_list: AddressList) -> bool:

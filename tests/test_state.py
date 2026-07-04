@@ -1,5 +1,7 @@
 from despamizer.models import EmailMessage, StateSettings
-from despamizer.state import WorkerState, fingerprint_message
+from despamizer.state import MAX_STORED_TEXT_CHARS, MessageState, WorkerState, fingerprint_message
+
+from sqlmodel import Session, select
 
 
 def test_state_creates_sqlite_file_and_tracks_message(tmp_path):
@@ -36,3 +38,21 @@ def test_state_cleanup_removes_expired_rows(tmp_path):
     row_count = state.cleanup()
 
     assert row_count == 0
+
+
+def test_state_truncates_untrusted_metadata(tmp_path):
+    state = WorkerState(
+        StateSettings(path=str(tmp_path / "despamizer.sqlite"), retention_days=365)
+    )
+    long_text = "x" * (MAX_STORED_TEXT_CHARS + 100)
+    message = EmailMessage("1", long_text, long_text, long_text, "body")
+
+    state.record_moved_to_spam("personal", message, long_text)
+
+    with Session(state.engine) as session:
+        row = session.exec(select(MessageState)).one()
+
+    assert len(row.message_id) == MAX_STORED_TEXT_CHARS
+    assert len(row.sender) == MAX_STORED_TEXT_CHARS
+    assert len(row.subject) == MAX_STORED_TEXT_CHARS
+    assert len(row.reason) == MAX_STORED_TEXT_CHARS
