@@ -25,7 +25,37 @@ Each worker cycle:
 
 ## Installation
 
-Clone the repository:
+Quick install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/iam-sayco/despamizer/main/install.sh | bash
+```
+
+The installer:
+
+- checks for Git, Docker, and Docker Compose,
+- clones the repository into `$HOME/despamizer` when it is not already running inside a checkout,
+- creates `config.yaml` from `config.example.yaml` when missing,
+- creates `.env` from `.env.default` when missing,
+- starts Docker Compose when `config.yaml` no longer contains template credentials.
+
+If this is a fresh install, edit `$HOME/despamizer/config.yaml` first and run:
+
+```bash
+cd "$HOME/despamizer"
+./install.sh
+```
+
+Install into a custom directory:
+
+```bash
+export DESPAMIZER_INSTALL_DIR=/opt/despamizer
+curl -fsSL https://raw.githubusercontent.com/iam-sayco/despamizer/main/install.sh | bash
+```
+
+## Manual Installation
+
+Clone the repository manually:
 
 ```bash
 git clone git@github.com:iam-sayco/despamizer.git
@@ -43,7 +73,7 @@ Edit `config.yaml` with your mailboxes. Keep `DESPAMIZER_WORKER_DRY_RUN=true` in
 
 `config.example.yaml` and `.env.default` are committed documentation templates. Do not put real credentials there. Put private mailbox settings in `config.yaml` and local runtime overrides in `.env`; both files are ignored by git.
 
-Start the stack:
+Start the stack manually:
 
 ```bash
 ./install.sh
