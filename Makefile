@@ -3,7 +3,8 @@ MAILBOX ?=
 .PHONY: help
 help:
 	@echo "Despamizer commands:"
-	@echo "  make install              Build and start the Docker Compose stack"
+	@echo "  make install              Bootstrap local files and start the stack"
+	@echo "  make run                  Pull, build, and recreate the Docker Compose stack"
 	@echo "  make probe MAILBOX=name   List IMAP folders for a configured mailbox"
 	@echo "  make run-once             Run one worker cycle using current .env"
 	@echo "  make dry-run              Run one forced dry-run worker cycle"
@@ -19,6 +20,11 @@ help:
 .PHONY: install
 install:
 	./install.sh
+
+.PHONY: run
+run:
+	docker compose pull --ignore-pull-failures
+	docker compose up -d --build --force-recreate
 
 .PHONY: probe
 probe:

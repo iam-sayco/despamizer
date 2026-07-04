@@ -130,6 +130,12 @@ After logs look correct, disable dry-run in `.env`:
 DESPAMIZER_WORKER_DRY_RUN=false
 ```
 
+Pull/build and recreate the long-running stack without bootstrapping local config files:
+
+```bash
+make run
+```
+
 Restart the worker:
 
 ```bash
@@ -171,7 +177,7 @@ make rebuild
 Start the long-running worker:
 
 ```bash
-docker compose up -d
+make run
 ```
 
 Run one worker cycle and exit:
@@ -187,6 +193,8 @@ make dry-run
 ```
 
 The long-running worker sleeps for `DESPAMIZER_WORKER_POLL_INTERVAL_SECONDS` between scans. The default interval is `300` seconds.
+
+Each daemon cycle uses the same `run_once` code path internally, so log cleanup, state cleanup, spam retention cleanup, learning, and mailbox scanning run in continuous mode too.
 
 ## Mailbox Config
 
