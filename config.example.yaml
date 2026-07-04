@@ -1,29 +1,52 @@
+# List of IMAP mailboxes processed by Despamizer.
 mailboxes:
+  # Local mailbox name used in logs, state DB, and Makefile commands.
   - name: personal
+    # IMAP server hostname.
     host: imap.example.com
+    # Encrypted IMAP port. Despamizer supports IMAP over TLS only.
     port: 993
+    # IMAP login username, usually the full email address.
     username: user@example.com
+    # IMAP password or app-specific password. Keep real secrets only in config.yaml.
     password: change-me
+    # Inbox folder scanned by the worker.
     inbox_folder: INBOX
+    # Spam/Junk folder where detected spam is moved and feedback is learned.
     spam_folder: Junk
+    # Permanently delete messages from spam_folder after this many days.
     retention: 30
+
+    # Allowlist entries are never moved to spam.
     whitelist:
+      # Example: exclude one trusted sender from spam handling.
       senders:
         - trusted@example.com
+      # Example: exclude every sender from a trusted domain.
       domains:
         - important-bank.example
+
+    # Blocklist entries are always treated as spam.
     blacklist:
+      # Example: always mark one sender as spam.
       senders:
         - scammer@example.net
+      # Example: always mark every sender from this domain as spam.
       domains:
         - spam-domain.example
+
+    # Extra case-insensitive Python regex rules. Message becomes spam when scores
+    # reach DESPAMIZER_SPAM_SCORE_MIN. Use score 10 for decisive local rules.
     rules:
+      # Example: sender address ends with @spam-domain.example.
       - type: sender
         pattern: "@spam-domain\\.example$"
         score: 10
+      # Example: subject contains one of these phrases.
       - type: subject
         pattern: "free money|crypto giveaway"
         score: 8
+      # Example: body contains this text.
       - type: body
         pattern: "unsubscribe here"
         score: 2

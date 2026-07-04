@@ -41,6 +41,8 @@ cp .env.default .env
 
 Edit `config.yaml` with your mailboxes. Keep `DESPAMIZER_WORKER_DRY_RUN=true` in `.env` for the first run.
 
+`config.example.yaml` and `.env.default` are committed documentation templates. Do not put real credentials there. Put private mailbox settings in `config.yaml` and local runtime overrides in `.env`; both files are ignored by git.
+
 Start the stack:
 
 ```bash
@@ -54,6 +56,32 @@ make logs
 ```
 
 Changes in `config.yaml`, `.env`, and files under `despamizer/` are mounted into the container and are visible on the next run without rebuilding the image.
+
+## Quick Customization
+
+Use `config.yaml` for mailbox-specific settings:
+
+```yaml
+mailboxes:
+  - name: personal
+    host: imap.example.com
+    port: 993
+    username: user@example.com
+    password: real-secret
+    inbox_folder: INBOX
+    spam_folder: Junk
+    retention: 30
+```
+
+Use `.env` to override runtime defaults from `.env.default`:
+
+```env
+DESPAMIZER_WORKER_DRY_RUN=false
+DESPAMIZER_WORKER_POLL_INTERVAL_SECONDS=600
+DESPAMIZER_SPAM_SCORE_MIN=5.0
+```
+
+The Compose stack reads `.env.default` first and `.env` second, so values in `.env` win.
 
 ## Common Commands
 
@@ -184,6 +212,32 @@ Rule types:
 
 Rules use Python regular expressions and are case-insensitive.
 
+Example allowlist entry that prevents one sender from being moved to spam:
+
+```yaml
+whitelist:
+  senders:
+    - trusted@example.com
+```
+
+Example body rule that marks messages containing a phrase as spam:
+
+```yaml
+rules:
+  - type: body
+    pattern: "special offer|limited time discount"
+    score: 10
+```
+
+Example subject rule for provider-side spam tags:
+
+```yaml
+rules:
+  - type: subject
+    pattern: "^\\[SPAM\\]"
+    score: 10
+```
+
 To discover exact IMAP folder names, define the mailbox connection fields first, then run:
 
 ```bash
@@ -202,7 +256,7 @@ This protects against accidental local reads by other Unix users. It does not en
 
 ## Runtime Config
 
-Runtime settings live in environment variables. Defaults are committed in `.env.default`; local overrides go into `.env`, which is ignored by git.
+Runtime settings live in environment variables. Defaults are committed in `.env.default`; local overrides go into `.env`, which is ignored by git. Usually you only edit `.env`; keep `.env.default` as the documented project baseline.
 
 Worker variables:
 
