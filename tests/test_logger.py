@@ -46,3 +46,15 @@ def test_cleanup_logs(monkeypatch):
         cleanup_logs(days=30)
         assert not old_log.exists()
         assert new_log.exists()
+
+
+def test_cleanup_logs_ignores_malformed_log_names(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        monkeypatch.setattr("despamizer.logger.LOG_DIR", tmp_path)
+        malformed_log = tmp_path / "not-a-date.log"
+        malformed_log.write_text("entry")
+
+        cleanup_logs(days=30)
+
+        assert malformed_log.exists()

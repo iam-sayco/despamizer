@@ -53,9 +53,7 @@ def test_classifier_marks_sender_rule_match_as_spam():
         subject="hello",
         body="normal body",
     )
-    rules = [
-        FilterRule(RuleType.SENDER, compile_rule_pattern("@spam\\.example$"), 10)
-    ]
+    rules = [FilterRule(RuleType.SENDER, compile_rule_pattern("@spam\\.example$"), 10)]
 
     result = classifier.classify(message, mailbox_with_rules(rules))
 
@@ -78,9 +76,7 @@ def test_classifier_ignores_non_matching_rules():
         subject="hello",
         body="normal body",
     )
-    rules = [
-        FilterRule(RuleType.SUBJECT, compile_rule_pattern("free money"), 10)
-    ]
+    rules = [FilterRule(RuleType.SUBJECT, compile_rule_pattern("free money"), 10)]
 
     result = classifier.classify(message, mailbox_with_rules(rules))
 
@@ -136,9 +132,7 @@ def test_classifier_skips_spamassassin_when_local_rules_are_decisive(monkeypatch
         subject="hello",
         body="normal body",
     )
-    rules = [
-        FilterRule(RuleType.SENDER, compile_rule_pattern("@spam\\.example$"), 5)
-    ]
+    rules = [FilterRule(RuleType.SENDER, compile_rule_pattern("@spam\\.example$"), 5)]
 
     result = classifier.classify(message, mailbox_with_rules(rules))
 
@@ -146,6 +140,25 @@ def test_classifier_skips_spamassassin_when_local_rules_are_decisive(monkeypatch
     assert result.score == 5
     assert result.reasons == ["rule:sender:@spam\\.example$"]
     assert FakeSpamAssassin.calls == 0
+
+
+def test_classifier_reports_when_full_message_is_needed():
+    classifier = SpamClassifier(
+        SpamSettings(
+            min_score=5,
+            spamassassin=SpamAssassinSettings(enabled=False),
+        )
+    )
+
+    assert classifier.needs_full_message(mailbox_with_rules([])) is False
+    assert (
+        classifier.needs_full_message(
+            mailbox_with_rules(
+                [FilterRule(RuleType.BODY, compile_rule_pattern("unsubscribe"), 5)]
+            )
+        )
+        is True
+    )
 
 
 def test_classifier_whitelist_wins_over_blacklist_and_rules():

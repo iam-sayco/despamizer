@@ -50,7 +50,10 @@ def cleanup_logs(days: int = 30) -> None:
             continue
         file_path = LOG_DIR / file
         if file_path.is_file():
-            file_date = datetime.datetime.strptime(file, "%Y-%m-%d.log")
+            try:
+                file_date = datetime.datetime.strptime(file, "%Y-%m-%d.log")
+            except ValueError:
+                continue
             if (now - file_date).days > days:
                 file_path.unlink()
                 log_message(f"Deleted old log: {file}")

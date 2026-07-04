@@ -40,16 +40,16 @@ def test_parse_response_reads_spamd_score():
 
 
 def test_client_sends_check_request(monkeypatch):
-    fake_socket = FakeSocket(
-        [b"SPAMD/1.5 0 EX_OK\r\nSpam: False ; 1.0 / 5.0\r\n\r\n"]
-    )
+    fake_socket = FakeSocket([b"SPAMD/1.5 0 EX_OK\r\nSpam: False ; 1.0 / 5.0\r\n\r\n"])
     calls = []
 
     def fake_create_connection(address, timeout):
         calls.append((address, timeout))
         return fake_socket
 
-    monkeypatch.setattr("despamizer.spamassassin.socket.create_connection", fake_create_connection)
+    monkeypatch.setattr(
+        "despamizer.spamassassin.socket.create_connection", fake_create_connection
+    )
 
     client = SpamAssassinClient(
         SpamAssassinSettings(
@@ -77,9 +77,7 @@ def test_client_sends_check_request(monkeypatch):
 
 
 def test_client_trims_oversized_raw_message(monkeypatch):
-    fake_socket = FakeSocket(
-        [b"SPAMD/1.5 0 EX_OK\r\nSpam: False ; 1.0 / 5.0\r\n\r\n"]
-    )
+    fake_socket = FakeSocket([b"SPAMD/1.5 0 EX_OK\r\nSpam: False ; 1.0 / 5.0\r\n\r\n"])
     monkeypatch.setattr(
         "despamizer.spamassassin.socket.create_connection",
         lambda address, timeout: fake_socket,
@@ -134,7 +132,9 @@ def test_client_returns_unavailable_on_connection_error(monkeypatch):
     monkeypatch.setattr("despamizer.spamassassin.log_message", lambda message: None)
 
     client = SpamAssassinClient(SpamAssassinSettings(enabled=True))
-    result = client.check(EmailMessage("1", "<a@example.com>", "a@example.com", "hello", "body"))
+    result = client.check(
+        EmailMessage("1", "<a@example.com>", "a@example.com", "hello", "body")
+    )
 
     assert result.available is False
 

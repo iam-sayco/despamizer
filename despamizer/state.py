@@ -86,6 +86,36 @@ class WorkerState:
         """Record that user manually placed a message in spam."""
         self._upsert(mailbox, message, "manual_spam", "spam", "manual_spam")
 
+    def delete_messages(self, mailbox: str, messages: list[EmailMessage]) -> int:
+        """Delete local state rows for permanently deleted remote messages."""
+        deleted_count = 0
+        with Session(self.engine) as session:
+            for message in messages:
+                fingerprint = fingerprint_message(message)
+                rows = []
+                row = session.get(MessageState, (mailbox, fingerprint.value))
+                if row is not None:
+                    rows.append(row)
+                if fingerprint.message_id:
+                    rows.extend(
+                        session.exec(
+                            select(MessageState).where(
+                                MessageState.mailbox == mailbox,
+                                MessageState.message_id == fingerprint.message_id,
+                            )
+                        ).all()
+                    )
+                seen_keys = set()
+                for row in rows:
+                    key = (row.mailbox, row.fingerprint)
+                    if key in seen_keys:
+                        continue
+                    seen_keys.add(key)
+                    session.delete(row)
+                    deleted_count += 1
+            session.commit()
+        return deleted_count
+
     def cleanup(self) -> int:
         """Delete expired state rows and return deletion count."""
         now = int(time.time())

@@ -15,6 +15,7 @@ def valid_config():
                 "password": "secret",
                 "inbox_folder": "INBOX",
                 "spam_folder": "Junk",
+                "retention": 14,
                 "whitelist": {"senders": ["friend@example.com"]},
                 "blacklist": {"domains": ["spam.example"]},
                 "rules": [
@@ -44,6 +45,7 @@ def test_parse_config_builds_typed_config(monkeypatch):
     assert config.spam.min_score == 5
     assert config.state.path == "/app/state/test.sqlite"
     assert config.state.retention_days == 180
+    assert config.mailboxes[0].retention == 14
     assert config.spam.rule_text_max_chars == 1000
     assert config.spam.spamassassin.host == "spamassassin"
     assert config.spam.spamassassin.message_bytes_max == 2048
@@ -113,8 +115,18 @@ def test_parse_config_uses_safe_runtime_defaults(monkeypatch):
     assert config.poll_interval_seconds == 300
     assert config.dry_run is True
     assert config.state.path == "/app/state/despamizer.sqlite"
+    assert config.mailboxes[0].retention == 14
     assert config.spam.rule_text_max_chars == 200000
     assert config.spam.spamassassin.message_bytes_max == 5000000
+
+
+def test_parse_config_defaults_mailbox_retention():
+    raw_config = valid_config()
+    del raw_config["mailboxes"][0]["retention"]
+
+    config = parse_config(raw_config)
+
+    assert config.mailboxes[0].retention == 30
 
 
 def test_parse_config_rejects_invalid_env_bool(monkeypatch):

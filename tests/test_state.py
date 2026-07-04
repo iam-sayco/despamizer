@@ -1,5 +1,10 @@
 from despamizer.models import EmailMessage, StateSettings
-from despamizer.state import MAX_STORED_TEXT_CHARS, MessageState, WorkerState, fingerprint_message
+from despamizer.state import (
+    MAX_STORED_TEXT_CHARS,
+    MessageState,
+    WorkerState,
+    fingerprint_message,
+)
 
 from sqlmodel import Session, select
 
@@ -56,3 +61,18 @@ def test_state_truncates_untrusted_metadata(tmp_path):
     assert len(row.sender) == MAX_STORED_TEXT_CHARS
     assert len(row.subject) == MAX_STORED_TEXT_CHARS
     assert len(row.reason) == MAX_STORED_TEXT_CHARS
+
+
+def test_state_deletes_rows_for_permanently_deleted_messages(tmp_path):
+    state = WorkerState(
+        StateSettings(path=str(tmp_path / "despamizer.sqlite"), retention_days=365)
+    )
+    message = EmailMessage(
+        "1", "<deleted@example.com>", "a@example.com", "hello", "body"
+    )
+    state.record_moved_to_spam("personal", message, "rule")
+
+    deleted_count = state.delete_messages("personal", [message])
+
+    assert deleted_count == 1
+    assert state.was_moved_to_spam("personal", message) is False

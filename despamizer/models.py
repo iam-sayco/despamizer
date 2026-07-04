@@ -1,6 +1,7 @@
 """Domain models for despamizer."""
 
 # Standard Library
+import datetime
 from dataclasses import dataclass, field
 from enum import StrEnum
 import re
@@ -84,6 +85,7 @@ class MailboxConfig:
     password: str
     inbox_folder: str
     spam_folder: str
+    retention: int = 30
     whitelist: AddressList = field(default_factory=AddressList)
     blacklist: AddressList = field(default_factory=AddressList)
     rules: list[FilterRule] = field(default_factory=list)
@@ -111,6 +113,7 @@ class EmailMessage:
     subject: str
     body: str
     raw: bytes = b""
+    received_at: datetime.datetime | None = None
 
 
 @dataclass(frozen=True)

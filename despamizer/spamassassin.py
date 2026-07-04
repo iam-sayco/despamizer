@@ -103,7 +103,9 @@ def _parse_response(response: str) -> SpamAssassinResult:
     )
 
 
-def _build_request(command: str, payload: bytes, headers: list[str] | None = None) -> bytes:
+def _build_request(
+    command: str, payload: bytes, headers: list[str] | None = None
+) -> bytes:
     request_headers = [f"{command} SPAMC/1.5", f"Content-length: {len(payload)}"]
     if headers:
         request_headers.extend(headers)

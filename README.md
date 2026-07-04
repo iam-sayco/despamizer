@@ -2,7 +2,7 @@
 
 Despamizer is a Docker Compose based IMAP worker that scans configured inbox folders, classifies messages with SpamAssassin and local mailbox rules, and moves spam to the configured spam folder.
 
-It is intentionally conservative: it does not delete messages, does not expunge folders, and only moves messages from `inbox_folder` to `spam_folder` when they are classified as spam.
+It is intentionally conservative: inbox processing only moves messages from `inbox_folder` to `spam_folder` when they are classified as spam. Permanent deletion is limited to spam-folder retention cleanup.
 
 ## How It Works
 
@@ -20,6 +20,7 @@ Each worker cycle:
 - applies whitelist, blacklist, regex rules, and SpamAssassin scoring,
 - moves spam to the configured spam folder unless dry-run mode is enabled,
 - scans spam folders for manual spam feedback,
+- permanently deletes spam-folder messages older than mailbox retention when dry-run mode is disabled,
 - records bounded local state in SQLite.
 
 ## Installation
@@ -139,6 +140,7 @@ mailboxes:
     password: change-me
     inbox_folder: INBOX
     spam_folder: Junk
+    retention: 30
     whitelist:
       senders:
         - trusted@example.com
@@ -167,6 +169,7 @@ Mailbox fields:
 - `host`, `port`, `username`, `password`: IMAP connection settings. Only encrypted IMAP is supported.
 - `inbox_folder`: folder scanned by the worker.
 - `spam_folder`: folder where spam is moved and manual spam feedback is read.
+- `retention`: spam-folder retention in days before permanent deletion, default `30`.
 - `whitelist.senders`: sender addresses that are never moved to spam.
 - `whitelist.domains`: sender domains that are never moved to spam.
 - `blacklist.senders`: sender addresses always treated as spam.
@@ -247,6 +250,8 @@ Despamizer uses these signals:
 
 A message is moved when local score reaches `DESPAMIZER_SPAM_SCORE_MIN` or SpamAssassin marks it as spam.
 
+Inbox scans fetch headers first. Full message content is fetched only when needed for body rules, SpamAssassin scoring, or rescued-ham learning. Decisive sender/subject rules and allow/block lists avoid full-message fetches.
+
 ## Learning And State
 
 Despamizer stores local state in SQLite. Docker Compose mounts host `./state` to `/app/state`, and the SQLite file is created automatically.
@@ -258,6 +263,7 @@ Feedback behavior:
 - If Despamizer moved a message to spam and the same message later appears in the inbox, it is treated as rescued ham, learned as ham, and skipped.
 - If a message appears in the spam folder and Despamizer did not move it there, it is treated as manual spam feedback and learned as spam.
 - Fingerprints are remembered so the same message is not learned repeatedly.
+- When spam retention permanently deletes remote messages, matching local state rows are removed too.
 - Expired state rows are cleaned according to `DESPAMIZER_STATE_RETENTION_DAYS`.
 
 ## SpamAssassin
@@ -269,6 +275,8 @@ Global SpamAssassin settings live in `docker/spamassassin/local.cf`. The contain
 Oversized messages are trimmed before they are sent to SpamAssassin. Despamizer preserves the message headers and sends a bounded body sample according to `DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX`.
 
 Bayes data and updated SpamAssassin rules are stored in the `spamassassin-state` Docker volume.
+
+Spam retention cleanup searches the spam folder by IMAP date criteria and fetches headers only before deleting matching old messages.
 
 ## Development
 
@@ -288,9 +296,9 @@ GitHub Actions run lint, tests, dependency audit, secret scanning, and filesyste
 
 ## Safety Model
 
-- No message deletion is implemented.
-- No IMAP expunge is used.
-- Only `inbox_folder` to `spam_folder` moves are performed.
+- Inbox processing only performs `inbox_folder` to `spam_folder` moves.
+- Permanent deletion and IMAP expunge are used only for messages already in the configured `spam_folder` and older than mailbox `retention`.
+- Dry-run mode disables message moves, learning writes, and spam retention deletion.
 - Dry-run mode is enabled by default.
 - Invalid regex rules fail config loading before IMAP processing.
 - Log output escapes control characters from untrusted mail data to prevent log forging.

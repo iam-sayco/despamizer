@@ -49,6 +49,9 @@ class DespamizerWorker:
         moved_count = 0
         would_move_count = 0
         skipped_count = 0
+        full_fetch_count = 0
+        deleted_spam_count = 0
+        deleted_state_count = 0
         try:
             with self.client_factory(mailbox) as client:
                 messages = client.iter_inbox_messages()
@@ -56,10 +59,32 @@ class DespamizerWorker:
                     f"[INFO] {mailbox.name}: fetched {len(messages)} inbox messages"
                 )
                 for message in messages:
-                    if self._handle_rescued_ham(mailbox, message):
+                    processing_message = self._message_for_rescued_ham(
+                        mailbox,
+                        message,
+                        client,
+                    )
+                    if processing_message is not message:
+                        full_fetch_count += 1
+                    if self._handle_rescued_ham(mailbox, processing_message):
                         skipped_count += 1
                         continue
-                    classification = self.classifier.classify(message, mailbox)
+                    classification = self.classifier.classify_local(
+                        processing_message,
+                        mailbox,
+                        include_body_rules=False,
+                    )
+                    if (
+                        not classification.is_spam
+                        and classification.reasons != ["whitelist"]
+                        and self.classifier.needs_full_message(mailbox)
+                    ):
+                        processing_message = client.get_inbox_message(message.uid)
+                        full_fetch_count += 1
+                        classification = self.classifier.classify(
+                            processing_message,
+                            mailbox,
+                        )
                     if not classification.is_spam:
                         continue
                     spam_count += 1
@@ -76,22 +101,45 @@ class DespamizerWorker:
                         would_move_count += 1
                         continue
                     client.move_to_spam(message.uid)
-                    self.state.record_moved_to_spam(mailbox.name, message, reason)
+                    self.state.record_moved_to_spam(
+                        mailbox.name,
+                        processing_message,
+                        reason,
+                    )
                     moved_count += 1
                     log_message(
                         f"[MOVED] {mailbox.name}: uid={message.uid} -> {mailbox.spam_folder}"
                     )
                 if not self.config.dry_run:
                     self._learn_manual_spam(mailbox, client)
+                    deleted_spam_count, deleted_state_count = self._cleanup_old_spam(
+                        mailbox,
+                        client,
+                    )
                 log_message(
                     f"[SUMMARY] {mailbox.name}: scanned={len(messages)} "
                     f"spam={spam_count} moved={moved_count} "
-                    f"would_move={would_move_count} skipped={skipped_count}"
+                    f"would_move={would_move_count} skipped={skipped_count} "
+                    f"full_fetch={full_fetch_count} "
+                    f"spam_deleted={deleted_spam_count} "
+                    f"state_deleted={deleted_state_count}"
                 )
         except Exception as exc:
-            log_message(
-                f"[ERROR] {mailbox.name}: {exc}\n{traceback.format_exc()}"
-            )
+            log_message(f"[ERROR] {mailbox.name}: {exc}\n{traceback.format_exc()}")
+
+    def _message_for_rescued_ham(
+        self,
+        mailbox: MailboxConfig,
+        message: EmailMessage,
+        client: ImapMailboxClient,
+    ) -> EmailMessage:
+        if not self.config.spam.learning.enabled:
+            return message
+        if not message.message_id:
+            return client.get_inbox_message(message.uid)
+        if self.state.was_moved_to_spam(mailbox.name, message):
+            return client.get_inbox_message(message.uid)
+        return message
 
     def _handle_rescued_ham(
         self,
@@ -131,7 +179,9 @@ class DespamizerWorker:
         if not learning.scan_spam_folder:
             return
 
-        spam_messages = client.iter_spam_messages(learning.max_spam_folder_messages_per_run)
+        spam_messages = client.iter_spam_messages(
+            learning.max_spam_folder_messages_per_run
+        )
         learned_count = 0
         skipped_count = 0
         failed_count = 0
@@ -153,3 +203,18 @@ class DespamizerWorker:
                 f"[LEARN] {mailbox.name}: manual spam scanned={len(spam_messages)} "
                 f"learned={learned_count} skipped={skipped_count} failed={failed_count}"
             )
+
+    def _cleanup_old_spam(
+        self,
+        mailbox: MailboxConfig,
+        client: ImapMailboxClient,
+    ) -> tuple[int, int]:
+        deleted_messages = client.delete_old_spam_messages(mailbox.retention)
+        if not deleted_messages:
+            return 0, 0
+        deleted_state_rows = self.state.delete_messages(mailbox.name, deleted_messages)
+        log_message(
+            f"[CLEANUP] {mailbox.name}: spam_deleted={len(deleted_messages)} "
+            f"state_deleted={deleted_state_rows} retention_days={mailbox.retention}"
+        )
+        return len(deleted_messages), deleted_state_rows

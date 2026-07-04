@@ -67,6 +67,7 @@ def _parse_mailbox(raw_mailbox: object, index: int) -> MailboxConfig:
         "password",
         "inbox_folder",
         "spam_folder",
+        "retention",
         "whitelist",
         "blacklist",
         "rules",
@@ -97,8 +98,15 @@ def _parse_mailbox(raw_mailbox: object, index: int) -> MailboxConfig:
         password=str(raw_mailbox["password"]),
         inbox_folder=str(raw_mailbox["inbox_folder"]),
         spam_folder=str(raw_mailbox["spam_folder"]),
-        whitelist=_parse_address_list(raw_mailbox.get("whitelist", {}), index, "whitelist"),
-        blacklist=_parse_address_list(raw_mailbox.get("blacklist", {}), index, "blacklist"),
+        retention=_positive_int(
+            raw_mailbox.get("retention", 30), f"mailboxes[{index}].retention"
+        ),
+        whitelist=_parse_address_list(
+            raw_mailbox.get("whitelist", {}), index, "whitelist"
+        ),
+        blacklist=_parse_address_list(
+            raw_mailbox.get("blacklist", {}), index, "blacklist"
+        ),
         rules=_parse_rules(raw_mailbox.get("rules", []), index),
     )
 
@@ -125,9 +133,11 @@ def _parse_spam_settings() -> SpamSettings:
                 _env("DESPAMIZER_SPAMASSASSIN_TIMEOUT_SECONDS", "15"),
                 "DESPAMIZER_SPAMASSASSIN_TIMEOUT_SECONDS",
             ),
-            required_score=None
-            if not required_score
-            else _number(required_score, "DESPAMIZER_SPAMASSASSIN_REQUIRED_SCORE"),
+            required_score=(
+                None
+                if not required_score
+                else _number(required_score, "DESPAMIZER_SPAMASSASSIN_REQUIRED_SCORE")
+            ),
             message_bytes_max=_positive_int(
                 _env("DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX", "5000000"),
                 "DESPAMIZER_SPAMASSASSIN_MESSAGE_BYTES_MAX",
@@ -135,9 +145,15 @@ def _parse_spam_settings() -> SpamSettings:
         ),
         learning=LearningSettings(
             enabled=_bool_env("DESPAMIZER_LEARNING_ENABLED", default=True),
-            learn_rescued_ham=_bool_env("DESPAMIZER_LEARNING_RESCUED_HAM", default=True),
-            learn_manual_spam=_bool_env("DESPAMIZER_LEARNING_MANUAL_SPAM", default=True),
-            scan_spam_folder=_bool_env("DESPAMIZER_LEARNING_SCAN_SPAM_FOLDER", default=True),
+            learn_rescued_ham=_bool_env(
+                "DESPAMIZER_LEARNING_RESCUED_HAM", default=True
+            ),
+            learn_manual_spam=_bool_env(
+                "DESPAMIZER_LEARNING_MANUAL_SPAM", default=True
+            ),
+            scan_spam_folder=_bool_env(
+                "DESPAMIZER_LEARNING_SCAN_SPAM_FOLDER", default=True
+            ),
             max_spam_folder_messages_per_run=_positive_int(
                 _env("DESPAMIZER_LEARNING_SPAM_FOLDER_MESSAGES_MAX", "100"),
                 "DESPAMIZER_LEARNING_SPAM_FOLDER_MESSAGES_MAX",
@@ -156,7 +172,9 @@ def _parse_state_settings() -> StateSettings:
     )
 
 
-def _parse_address_list(raw_list: object, mailbox_index: int, field: str) -> AddressList:
+def _parse_address_list(
+    raw_list: object, mailbox_index: int, field: str
+) -> AddressList:
     if raw_list is None:
         return AddressList()
     if not isinstance(raw_list, dict):

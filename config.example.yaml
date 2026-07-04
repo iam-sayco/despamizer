@@ -6,6 +6,7 @@ mailboxes:
     password: change-me
     inbox_folder: INBOX
     spam_folder: Junk
+    retention: 30
     whitelist:
       senders:
         - trusted@example.com

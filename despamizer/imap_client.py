@@ -1,5 +1,8 @@
 """IMAP client wrapper."""
 
+# Standard Library
+import datetime
+
 from .models import EmailMessage, MailboxConfig
 
 
@@ -24,9 +27,29 @@ class ImapMailboxClient:
         self._mailbox.logout()
 
     def iter_inbox_messages(self) -> list[EmailMessage]:
-        """Fetch messages from configured inbox without marking them as seen."""
+        """Fetch inbox message headers without marking messages as seen."""
         self._mailbox.folder.set(self.config.inbox_folder)
-        return self._fetch_messages()
+        messages = []
+        for message in self._mailbox.fetch(
+            "ALL",
+            mark_seen=False,
+            headers_only=True,
+            bulk=True,
+        ):
+            messages.append(_normalize_message(message, include_body=False))
+        return messages
+
+    def get_inbox_message(self, uid: str) -> EmailMessage:
+        """Fetch one full inbox message by UID without marking it as seen."""
+        _validate_uid(uid)
+        self._mailbox.folder.set(self.config.inbox_folder)
+        message = next(
+            self._mailbox.fetch(f"UID {uid}", mark_seen=False, bulk=False),
+            None,
+        )
+        if message is None:
+            raise ValueError(f"Message not found: uid={uid}")
+        return _normalize_message(message, include_body=True)
 
     def list_folders(self) -> list[str]:
         """Return IMAP folder names."""
@@ -37,32 +60,56 @@ class ImapMailboxClient:
         self._mailbox.folder.set(self.config.spam_folder)
         messages = []
         for index, message in enumerate(
-            self._mailbox.fetch("ALL", mark_seen=False, bulk=True),
+            self._mailbox.fetch("ALL", mark_seen=False, bulk=False),
             start=1,
         ):
             if index > limit:
                 break
-            messages.append(_normalize_message(message))
+            messages.append(_normalize_message(message, include_body=True))
         return messages
 
-    def _fetch_messages(self) -> list[EmailMessage]:
-        messages = []
-        for message in self._mailbox.fetch("ALL", mark_seen=False, bulk=True):
-            messages.append(_normalize_message(message))
-        return messages
+    def delete_old_spam_messages(self, retention_days: int) -> list[EmailMessage]:
+        """Permanently delete spam messages older than retention days."""
+        self._mailbox.folder.set(self.config.spam_folder)
+        cutoff = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+            days=retention_days
+        )
+        search_criteria = f"BEFORE {cutoff.strftime('%d-%b-%Y')}"
+        deleted_messages = []
+        for message in self._mailbox.fetch(
+            search_criteria,
+            mark_seen=False,
+            headers_only=True,
+            bulk=True,
+        ):
+            if not _is_older_than(message.date, cutoff):
+                continue
+            deleted_messages.append(_normalize_message(message, include_body=False))
+
+        if deleted_messages:
+            deleted_uids = [message.uid for message in deleted_messages]
+            for uid in deleted_uids:
+                _validate_uid(uid)
+            self._mailbox.delete(deleted_uids)
+            self._mailbox.expunge()
+        return deleted_messages
 
     def move_to_spam(self, uid: str) -> None:
         """Move one message to the configured spam folder."""
+        _validate_uid(uid)
         self._mailbox.move(uid, self.config.spam_folder)
 
 
-def _normalize_message(message: object) -> EmailMessage:
-    body = "\n".join(part for part in [message.text, message.html] if part)
+def _normalize_message(message: object, *, include_body: bool) -> EmailMessage:
+    body = ""
+    if include_body:
+        body = "\n".join(part for part in [message.text, message.html] if part)
     raw = b""
     message_id = ""
     message_obj = message.obj
     if message_obj is not None:
-        raw = message_obj.as_bytes()
+        if include_body:
+            raw = message_obj.as_bytes()
         message_id = message_obj.get("Message-ID", "")
     return EmailMessage(
         uid=str(message.uid),
@@ -71,4 +118,21 @@ def _normalize_message(message: object) -> EmailMessage:
         subject=message.subject or "",
         body=body,
         raw=raw,
+        received_at=message.date,
     )
+
+
+def _is_older_than(
+    message_date: datetime.datetime | None,
+    cutoff: datetime.datetime,
+) -> bool:
+    if message_date is None:
+        return False
+    if message_date.tzinfo is None:
+        message_date = message_date.replace(tzinfo=datetime.UTC)
+    return message_date <= cutoff
+
+
+def _validate_uid(uid: str) -> None:
+    if not uid.isdigit():
+        raise ValueError("IMAP UID must be numeric")
