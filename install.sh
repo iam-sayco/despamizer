@@ -87,4 +87,4 @@ if [ "$SKIP_START" = "true" ]; then
 fi
 
 log "Starting Docker Compose stack"
-docker compose up -d --build
+docker compose up -d --build --force-recreate

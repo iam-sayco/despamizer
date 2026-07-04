@@ -9,6 +9,7 @@ services:
       - path: .env
         required: false
     user: "${DESPAMIZER_CONTAINER_UID:-1000}:${DESPAMIZER_CONTAINER_GID:-1000}"
+    command: ["poetry", "run", "python", "-m", "despamizer", "--vvv", "run"]
     depends_on:
       config-permissions:
         condition: service_completed_successfully

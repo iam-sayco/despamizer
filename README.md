@@ -86,6 +86,8 @@ Inspect logs:
 make logs
 ```
 
+The long-running Docker worker prints logs to container stdout and also writes daily files under `logs/`.
+
 Changes in `config.yaml`, `.env`, and files under `despamizer/` are mounted into the container and are visible on the next run without rebuilding the image.
 
 ## Quick Customization

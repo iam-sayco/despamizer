@@ -3,20 +3,20 @@
 # Standard Library
 import datetime
 import os
+from pathlib import Path
 
 from .settings import PROJECT_DIR, VERBOSE
 
 LOG_DIR = PROJECT_DIR / "logs"
 MAX_LOG_MESSAGE_CHARS = 4000
 os.makedirs(LOG_DIR, exist_ok=True)
-log_file = LOG_DIR / f"{datetime.date.today()}.log"
 
 
 def log_message(message: str) -> None:
     """Log a message to today's log file."""
     timestamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
     log_line = f"{timestamp} {_sanitize_log_message(message)}"
-    with open(log_file, "a") as log:
+    with open(_current_log_file(), "a") as log:
         log.write(f"{log_line}\n")
     if VERBOSE:
         print(log_line)  # noqa: T201
@@ -57,3 +57,7 @@ def cleanup_logs(days: int = 30) -> None:
             if (now - file_date).days > days:
                 file_path.unlink()
                 log_message(f"Deleted old log: {file}")
+
+
+def _current_log_file() -> Path:
+    return LOG_DIR / f"{datetime.date.today()}.log"
