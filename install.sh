@@ -20,6 +20,19 @@ require_command() {
     fi
 }
 
+set_env_value() {
+    local key="$1"
+    local value="$2"
+    local escaped_value
+
+    escaped_value="$(printf '%s' "$value" | sed 's/[\/&]/\\&/g')"
+    if grep -q "^${key}=" .env; then
+        sed -i "s/^${key}=.*/${key}=${escaped_value}/" .env
+    else
+        printf '%s=%s\n' "$key" "$value" >> .env
+    fi
+}
+
 require_command git "Git is required. Install Git before running Despamizer."
 require_command docker "Docker is required. Install Docker before running Despamizer."
 
@@ -54,6 +67,12 @@ if [ ! -f .env ]; then
 else
     log "Keeping existing .env"
 fi
+
+mkdir -p logs state
+set_env_value "DESPAMIZER_CONTAINER_UID" "$(id -u)"
+set_env_value "DESPAMIZER_CONTAINER_GID" "$(id -g)"
+chmod 600 config.yaml
+log "Configured worker container UID/GID as $(id -u):$(id -g)"
 
 if grep -Eq 'imap\.example\.com|password:[[:space:]]*change-me' config.yaml; then
     log "Bootstrap complete: $(pwd)"
