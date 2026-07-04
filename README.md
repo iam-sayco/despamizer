@@ -283,7 +283,7 @@ The command prints folder names from the remote IMAP server and does not fetch o
 
 Docker Compose runs a short `config-permissions` service before the worker starts. It executes `chmod 600 config.yaml` on the host-mounted file and then exits. The worker starts only after that one-shot service completes successfully.
 
-`install.sh` stores the current host UID/GID in `.env`, and Docker Compose runs the worker with that identity. This lets the worker read `config.yaml` while keeping the file private to the host user.
+`install.sh` stores the current host UID/GID in `.env`, and Docker Compose runs the worker with that identity. The one-shot service also assigns that owner to `config.yaml`, `logs/`, and `state/` recursively, so the worker can read private config and write logs/SQLite state without running as root.
 
 This protects against accidental local reads by other Unix users. It does not encrypt the secret; IMAP still requires the worker to read the real password.
 

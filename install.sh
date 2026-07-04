@@ -72,6 +72,7 @@ mkdir -p logs state
 set_env_value "DESPAMIZER_CONTAINER_UID" "$(id -u)"
 set_env_value "DESPAMIZER_CONTAINER_GID" "$(id -g)"
 chmod 600 config.yaml
+chmod 700 logs state
 log "Configured worker container UID/GID as $(id -u):$(id -g)"
 
 if grep -Eq 'imap\.example\.com|password:[[:space:]]*change-me' config.yaml; then
